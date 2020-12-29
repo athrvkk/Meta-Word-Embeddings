@@ -37,14 +37,14 @@ class AEME():
         elif activation == "paramaterized_leaky_relu":
             activation = PReLU()           
         else:
-            activation = activation()
+            activation = Activation(activation)
               
         if mode == "DAEME":
             self.ae = DAE(latent_dim, activation, lambda1, lambda2, lambda3, lambda4, lambda5, lambda6)
         elif mode == "CAEME":
             self.ae = CAE(latent_dim, activation, lambda1, lambda2, lambda3)
         elif mode == "AAEME":
-            self.ae = AAE(300, activation, lambda1, lambda2, lambda3)
+            self.ae = AAE(latent_dim, activation, lambda1, lambda2, lambda3)
               
         # Save best model callback
         self.model_checkpoint_callback = ModelCheckpoint(filepath=model_checkpoint_path,
@@ -83,15 +83,15 @@ class AEME():
         """
         data_size, feature_size = data.shape
         for i in range(data_size):
-        mask_noise = np.random.randint(0, feature_size, int(feature_size * masking_noise_factor))
-        for m in mask_noise:
-            data[i][m] = 0
+            mask_noise = np.random.randint(0, feature_size, int(feature_size * masking_noise_factor))
+            for m in mask_noise:
+                data[i][m] = 0
         return data
         
 
 
         
-    def train(self, x_train1, x_train2, x_train3, epochs=200, batch_size=32, masking_noise=False, masking_noise_factor=0.05):
+    def train(self, x_train1, x_train2, x_train3, epochs=200, batch_size=32, masking_noise=True, masking_noise_factor=0.05):
         """ Function to train the Autoencoder Model.
         @param x_train (np.array): The input data.
         @@param epochs (int): Number of epochs for which the model is to be trained. Default: 10.
@@ -125,7 +125,16 @@ class AEME():
         
         
    
-        
+    def predict(self, x_test1, x_test2, x_test3, model_checkpoint):
+        """ Function to generate predictions of the autoencoder's encoder.
+        @param x_test1 (np.array): test input 1.
+        @param x_test2 (np.array): test input 2.
+        @param x_test3 (np.array): test input 3.
+        @param model_checkpoint (string): model weights.
+        @return predictions (np.array): Autoencoder's encoder's predictions.
+        """
+        self.model.load_weights(model_checkpoint)     
+        return self.encoder.predict([x_test1, x_test2, x_test3])
     
             
             

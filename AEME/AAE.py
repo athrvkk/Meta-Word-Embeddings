@@ -50,6 +50,8 @@ class AAE():
         model.compile(optimizer="adam", loss=self.AAE_loss)
         model.summary()
         
+        return model, encoder
+        
         
         
         

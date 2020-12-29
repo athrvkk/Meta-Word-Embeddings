@@ -38,25 +38,39 @@ class DAE():
         """Function to build the decopuled autoencoder.
         @param input_dim (shape): shape of the input dimensions.
         """
+        
+        def DAE_loss(self, y_true, y_pred):
+            """ Function to compute loss for Decopuled Autoencoder.
+            @param y_true (np.array): input vector.
+            @param y_pred (np.array): output vector.
+            @return loss (float): the computed loss
+            """    
+            return (self.mse(y_true[0], y_pred[0], self.lambda1) + 
+                    self.mse(y_true[1], y_pred[1], self.lambda2) + 
+                    self.mse(y_true[2], y_pred[2], self.lambda3))
+                
+                
         input1 = Input(shape=(input_dim,))
-        Dense1 = Dense(self.latent_dim, activation=self.activation)(input1)
+        Dense1 = Dense(self.latent_dim, activation=self.activation, name="encoder1")(input1)
         
         input2 = Input(shape=(input_dim,))
-        Dense2 = Dense(self.latent_dim, activation=self.activation)(input2)
+        Dense2 = Dense(self.latent_dim, activation=self.activation, name="encoder2")(input2)
         
         input3 = Input(shape=(input_dim,))
-        Dense3 = Dense(self.latent_dim, activation=self.activation)(input3)
+        Dense3 = Dense(self.latent_dim, activation=self.activation, name="encoder3")(input3)
         
-        bottleneck = concatenate([Dense1, Dense2, Dense3])
+        bottleneck = concatenate([Dense1, Dense2, Dense3], name="bottleneck")
         
-        output1 = Dense(input_dim, activation=self.activation)(input1)
-        output2 = Dense(input_dim, activation=self.activation)(input2)
-        output3 = Dense(input_dim, activation=self.activation)(input3)
+        output1 = Dense(input_dim, activation=self.activation, name="decoder1")(input1)
+        output2 = Dense(input_dim, activation=self.activation, name="decoder2")(input2)
+        output3 = Dense(input_dim, activation=self.activation, name="decoder3")(input3)
         
         model = Model(inputs=[input1, input2, input3], outputs=[output1, output2, output3])
         encoder = Model(inputs=[input1, input2, input3], outputs=bottleneck)
         model.compile(optimizer="adam", loss=self.DAE_loss)
         model.summary()
+        
+        return model, encoder
         
         
         
@@ -70,25 +84,6 @@ class DAE():
         """
         return factor*K.mean(K.square(y_true - y_pred))
         
-        
-    def DAE_loss(self, y_true, y_pred):
-        """ Function to compute loss for Decopuled Autoencoder.
-        @param y_true (np.array): input vector.
-        @param y_pred (np.array): output vector.
-        @return loss (float): the computed loss
-        """    
-        return (self.mse(y_true[0], y_pred[0], self.lambda1) + 
-                self.mse(y_true[1], y_pred[1], self.lambda2) + 
-                self.mse(y_true[2], y_pred[2], self.lambda3))
                     
-        loss1 = self.mse(y_true[0], y_pred[0], self.lambda1)
-        loss2 = self.mse(y_true[1], y_pred[1], self.lambda2)
-        loss3 = self.mse(y_true[2], y_pred[2], self.lambda3)
-        
-        loss4 = self.mse(y_true[0], y_true[1], self.lambda4)
-        loss5 = self.mse(y_true[1], y_true[2], self.lambda5)
-        loss6 = self.mse(y_true[2], y_true[0], self.lambda6)
-        
-        loss = loss1 + loss2 + loss3 + loss4 + loss5 + loss6
-        return loss
+
         

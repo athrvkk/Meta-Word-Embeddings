@@ -50,6 +50,8 @@ class CAE():
         model.compile(optimizer="adam", loss=self.CAE_loss)
         model.summary()
         
+        return model, encoder
+        
         
         
         
