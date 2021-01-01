@@ -2,9 +2,11 @@
 # File: AEME.py
 # Author: Atharva Kulkarni
 
-from tensorflow.keras import backend as K
-from tensorflow.keras.layers import LeakyReLU, PReLU, Activation
-from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+import torch.nn as nn
+from torch.optim import Adam
+#from tensorflow.keras import backend as K
+#from tensorflow.keras.layers import LeakyReLU, PReLU, Activation
+#from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 from DAE import DAE
 from CAE import CAE
 from AAE import AAE
@@ -29,15 +31,14 @@ class AEME():
         @param patience (int): number of epochs with no improvement after which learning rate will be reduced. Default: 5.
         """
         self.mode = mode
-        self.model = None
         self.encoder = None
         
         if activation == "leaky_relu":
-            activation = LeakyReLU()
+            activation = nn.LeakyReLU()
         elif activation == "paramaterized_leaky_relu":
-            activation = PReLU()           
+            activation = nn.PReLU()           
         else:
-            activation = Activation(activation)
+            activation = nn.ReLU()
               
         if mode == "DAEME":
             self.ae = DAE(latent_dim, activation, lambda1, lambda2, lambda3, lambda4, lambda5, lambda6)
@@ -62,15 +63,6 @@ class AEME():
                                                     verbose=1)
                                                     
             
-
-
-            
-    def build(self, input_dim):
-        """ Function to build the autoencoder.
-        @param input_dim (shape): shape of the input dimensions.
-        """
-        self.model, self.encoder = self.ae.build(input_dim)
-        
             
 
 
@@ -99,11 +91,22 @@ class AEME():
         @param masking_noise (float): Percentage noise to be induced in the input data. Default: 0.05 or 5%.
         @ return histroy (History object): history of the model.
         """
+        self.ae.train()
+        self.ae.to(self.device)
+        
         if masking_noise:
             noisy_x_train1 = self.add_noise(x_train1, masking_noise_factor)
             noisy_x_train2 = self.add_noise(x_train2, masking_noise_factor)
             noisy_x_train3 = self.add_noise(x_train3, masking_noise_factor)
             
+            optimizer = Adam(self.ae.parameters(), lr = 0.001)    
+            
+            for step in range(epochs+1):
+            
+            
+            
+
+            '''
             history = self.ae.fit([noisy_x_train1, noisy_x_train2, noisy_x_train3],
                                   [x_train1, x_train2, x_train3], 
                                   epochs=epochs, 
@@ -111,7 +114,7 @@ class AEME():
                                   shuffle=True,
                                   verbose=1,
                                   callbacks=[self.model_checkpoint_callback, self.reduce_lr_callback])
-        
+            '''
         else:
             history = self.ae.fit([x_train1, x_train2, x_train3],
                                   [x_train1, x_train2, x_train3], 
