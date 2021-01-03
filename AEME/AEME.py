@@ -2,8 +2,9 @@
 # File: AEME.py
 # Author: Atharva Kulkarni
 
+import torch
 import torch.nn as nn
-from torch.optim import Adam
+from torch.utils.data import TensorDataset, RandomSampler, DataLoader
 #from tensorflow.keras import backend as K
 #from tensorflow.keras.layers import LeakyReLU, PReLU, Activation
 #from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
@@ -13,12 +14,12 @@ from AAE import AAE
 
 
 class AEME():
-    """ Class to implement Autoencoder for generating Meta-Embeddings"""
+    """ Class to implement Autoencoder for generating Meta-Embeddings """
     
-    def __init__(self, model_checkpoint_path, mode="DAEME", latent_dim=100, activation="leaky_relu", lambda1=1, lambda2=1, lambda3=1, lambda4=1, lambda5=1, lambda6=1, lr_reduce_factor=0.2, patience=5):
+    def __init__(self, model_checkpoint_path, mode="DAE", latent_dim=100, activation="leaky_relu", lambda1=1, lambda2=1, lambda3=1, lambda4=1, lambda5=1, lambda6=1):
         """ Constructor to initialize autoencoder parameters
         @param model_checkpoint_path (string): path to store ModelCheckpoints.
-        @param mode (string): type of Autoencoder to build: Decoupled Autoencoded Meta-Embedding (DAEME), Concatenated Autoencoded Meta-Embedding (CAEME), Averaged Autoencoded Meta-Embedding (AAEME).
+        @param mode (string): type of Autoencoder to build: Decoupled Autoencoder (DAE), Concatenated Autoencoder (CAE), Averaged Autoencoder (AAE).
         @param latent_dim (int): latent_dimension for each autoencoder. Default: 300.
         @ activation (string): type of activation: leaky_relu, paramaterized_leaky_relu, relu, tanh, and sigmoid. Default: leaky_relu.
         @param lambda1 (int): Multiplicaiton factor for computing loss for part1. Default: 1.
@@ -27,8 +28,6 @@ class AEME():
         @param lambda4 (int): Multiplicaiton factor for computing loss for part4 (Only for DAE). Default: 1.
         @param lambda5 (int): Multiplicaiton factor for computing loss for part5 ((Only for DAE). Default: 1.
         @param lambda6 (int): Multiplicaiton factor for computing loss for part6 ((Only for DAE). Default: 1.
-        @param lr_reduce_factor (float): factor by which the learning rate will be reduced. new_lr = lr * factor. Default value: 0.2.
-        @param patience (int): number of epochs with no improvement after which learning rate will be reduced. Default: 5.
         """
         self.mode = mode
         self.encoder = None
@@ -40,33 +39,16 @@ class AEME():
         else:
             activation = nn.ReLU()
               
-        if mode == "DAEME":
+        if mode == "DAE":
             self.ae = DAE(latent_dim, activation, lambda1, lambda2, lambda3, lambda4, lambda5, lambda6)
-        elif mode == "CAEME":
+        elif mode == "CAE":
             self.ae = CAE(latent_dim, activation, lambda1, lambda2, lambda3)
-        elif mode == "AAEME":
+        elif mode == "AAE":
             self.ae = AAE(latent_dim, activation, lambda1, lambda2, lambda3)
-              
-        # Save best model callback
-        self.model_checkpoint_callback = ModelCheckpoint(filepath=model_checkpoint_path,
-                                                         save_weights_only=True,
-                                                         monitor='loss',
-                                                         mode='auto',
-                                                         save_freq = 'epoch',
-                                                         save_best_only=True)
-        # Reduce learning rate callback
-        self.reduce_lr_callback = ReduceLROnPlateau(monitor='loss', 
-                                                    mode='auto',
-                                                    factor=lr_reduce_factor, 
-                                                    patience=patience, 
-                                                    min_lr=0.0005, 
-                                                    verbose=1)
-                                                    
+                                                            
             
             
 
-
-    
     def add_noise(self, data, masking_noise_factor):   
         """Function to add mask noise to data.
         @param data (np.array): data to add noise to.
@@ -82,51 +64,97 @@ class AEME():
         
 
 
+    
+    def prepare_input(x_train1, x_train2, x_train3, batch_size=128, masking_noise=True, masking_noise_factor=0.05): 
+        """ Funciton to compile data in Dataloaders
+        @param x_train1 (np.array): The input data1.
+        @param x_train2 (np.array): The input data2.
+        @param x_train3 (np.array): The input data3.
+        @param batch_size (int): Number of batches to divide the training data into.
+        @param masking_noise (bool): To add Masking Noise or not.
+        @param masking_noise_factor (float): Percentage noise to be induced in the input data. Default: 0.05 or 5%.
+        """
+        if masking_noise:
+            x_train1 = self.add_noise(x_train1, masking_noise_factor)
+            x_train2 = self.add_noise(x_train2, masking_noise_factor)
+            x_train3 = self.add_noise(x_train3, masking_noise_factor)
+            
+        tensor_dataset = torch.utils.data.TensorDataset(x_train1, 
+                                                        x_train2, 
+                                                        x_train3)
+        del x_train1
+        del x_train2
+        del x_train3
+        del tensor_dataset
+        gc.collect()
+        torch.cuda.empty_cache()
+        return torch.utils.data.DataLoader(dataset=tensor_dataset, 
+                                           sampler=torch.utils.data.RandomSampler(tensor_dataset),
+                                           batch_size=batch_size)
+                   
         
-    def train(self, x_train1, x_train2, x_train3, epochs=200, batch_size=32, masking_noise=True, masking_noise_factor=0.05):
-        """ Function to train the Autoencoder Model.
-        @param x_train (np.array): The input data.
+        
+        
+    def train(self, data_loader, epochs=200):
+        """ Function to train the Autoencoder Model.    
+        @param tensor_data_loader (torch.tensor): Batch-wise dataset.
         @@param epochs (int): Number of epochs for which the model is to be trained. Default: 10.
-        @param batch_size (int): Number of batches to divide the training data during training.
-        @param masking_noise (float): Percentage noise to be induced in the input data. Default: 0.05 or 5%.
-        @ return histroy (History object): history of the model.
         """
         self.ae.train()
         self.ae.to(self.device)
+     
+        optimizer = torch.optim.Adam(self.ae.parameters())    
         
-        if masking_noise:
-            noisy_x_train1 = self.add_noise(x_train1, masking_noise_factor)
-            noisy_x_train2 = self.add_noise(x_train2, masking_noise_factor)
-            noisy_x_train3 = self.add_noise(x_train3, masking_noise_factor)
-            
-            optimizer = Adam(self.ae.parameters(), lr = 0.001)    
-            
-            for step in range(epochs+1):
-            
-            
-            
-
-            '''
-            history = self.ae.fit([noisy_x_train1, noisy_x_train2, noisy_x_train3],
-                                  [x_train1, x_train2, x_train3], 
-                                  epochs=epochs, 
-                                  batch_size=batch_size,
-                                  shuffle=True,
-                                  verbose=1,
-                                  callbacks=[self.model_checkpoint_callback, self.reduce_lr_callback])
-            '''
+        training_loss = []
+        
+        if self.mode == "DAE": 
+            for step in range(epochs):
+                epoch_loss = 0.0
+                for batch_data in data_loader:
+                    x_train1, x_train2, x_train3 = tuple(t.to(self.device) for t in batch_data)
+                    optimizer.zero_grad()
+                    output, bottleneck = self.ae(x_train1, x_train2, x_train3)
+                    loss = self.ae.loss([output, bottleneck], [x_train1, x_train2, x_train3])
+                    loss.backward()
+                    epoch_loss = epoch_loss + loss.item() 
+                    optimizer.step()
+                loss = epoch_loss/len(data_loader)
+                training_loss.append(loss)
+                print("\nEpoch: {} of {} ----> loss: {:.3f}".format(step+1, epochs, loss))
+                
+                if loss >= training_loss[-2]:
+                    model_checkpoint = model_checkpoint + "_epoch_" + (step+1) + "_loss_" + loss + ".pt"
+                    torch.save({"epoch": step+1,
+                                "model_state_dict": self.ae.state_dict(),
+                                "optimizer_state_dict": optimizer.state_dict(),
+                                "loss": loss}, 
+                                model_checkpoint)
+                                
         else:
-            history = self.ae.fit([x_train1, x_train2, x_train3],
-                                  [x_train1, x_train2, x_train3], 
-                                  epochs=epochs, 
-                                  batch_size=batch_size,
-                                  shuffle=True,
-                                  verbose=1,
-                                  callbacks=[self.model_checkpoint_callback, self.reduce_lr_callback])
-        return history
+            for step in range(epochs):
+                epoch_loss = 0.0
+                for batch_data in data_loader:
+                    x_train1, x_train2, x_train3 = tuple(t.to(self.device) for t in batch_data)
+                    optimizer.zero_grad()
+                    output, _ = self.ae(x_train1, x_train2, x_train3)
+                    loss = self.ae.loss(output, [x_train1, x_train2, x_train3])
+                    loss.backward()
+                    epoch_loss = epoch_loss + loss.item() 
+                    optimizer.step()
+                loss = epoch_loss/len(data_loader)
+                training_loss.append(loss)
+                print("\nEpoch: {} of {} ----> loss: {:.3f}".format(step+1, epochs, loss))
+                
+                if loss >= training_loss[-2]:
+                    model_checkpoint = model_checkpoint + "_epoch_" + (step+1) + "_loss_" + loss + ".pt"
+                    torch.save({"epoch": step+1,
+                                "model_state_dict": self.ae.state_dict(),
+                                "optimizer_state_dict": optimizer.state_dict(),
+                                "loss": loss}, 
+                                model_checkpoint)
+  
         
-        
-        
+   
    
     def predict(self, x_test1, x_test2, x_test3, model_checkpoint):
         """ Function to generate predictions of the autoencoder's encoder.

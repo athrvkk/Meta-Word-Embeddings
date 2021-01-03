@@ -5,7 +5,7 @@
 from utils import Utils
 import argparse
 from time import process_time
-from gensim.models import KeyedVectors
+
 
 
 # python vocabulary-intersection.py

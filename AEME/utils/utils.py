@@ -5,13 +5,14 @@
 import numpy as np
 import pandas as pd
 import re
+import torch
 from gensim.models.coherencemodel import CoherenceModel
 from gensim.models import KeyedVectors
 
 
 
 class Utils():
-    """" Class for I/O functionalitie """
+    """" Class for I/O functionalities """
     
     
     def read_data(self, path, columns):
@@ -21,6 +22,7 @@ class Utils():
             """
             data = pd.read_csv(path, usecols=columns, encoding="utf-8")
             return data
+
 
 
 
@@ -36,6 +38,7 @@ class Utils():
 
 
 
+
     
     def get_vocab(self, path):
         """ Function to get vocabulary from embedding file.
@@ -46,10 +49,10 @@ class Utils():
             return [word for word in KeyedVectors.load_word2vec_format(path, binary=True).vocab.keys()]
         else:
             return [word for word in KeyedVectors.load_word2vec_format(path, binary=False).vocab.keys()]
-        #return vocab
         
         
         
+
          
     def get_embedding_dict(self, path, vocab):
             """ Function to retreive embeddings from a file into a dictionary.
@@ -69,6 +72,7 @@ class Utils():
 
       
             
+
                              
     def get_embedding_matrix(self, path, vocab=None):
             """ Function to retreive embeddings from a file into a matrix.
@@ -91,11 +95,56 @@ class Utils():
 
 
 
+    
+    def map_embeddings(self, vocab, embedding_dict1, embedding_dict2, embedding_dict3):
+        """ Funciton to map embeddings.
+        @param vocab (list): list of the vocabulary to map embeddings for.
+        @param embedding_dict1 (dict): Dictionary for embedding 1.
+        @param embedding_dict2 (dict): Dictionary for embedding 2.
+        @param embedding_dict3 (dict): Dictionary for embedding 3.
+        @ return embedding1 (tensor), embedding2 (tensor), embedding3 (tensor): arrays of mapped embeddings.
+        """
+        embedding1 = []
+        embedding2 = []
+        embedding3 = []
+        for word in vocab:
+            embedding1.append(embedding_dict1.get(word))
+            embedding2.append(embedding_dict2.get(word))
+            embedding3.append(embedding_dict3.get(word))
+        return torch.tensor(embedding1), torch.tensor(embedding2), torch.tensor(embedding3)
+        
+        
+        
+
+    
+    def read_vocab(self, file_path):
+        """ Function to read vocab
+        @param file_path (str): file path to read the vocabulary.
+        @return vocab (list): return a vocabulary list.
+        """
+        vocab = []
+        with open(file_path, "r") as f:
+            data = f.readlines()
+        f.close()
+        for row in data:
+            row = row.split("\n")
+            vocab.append(row[0])
+        return vocab
+        
+        
+        
+
+        
     def write_vocab(self, file_path, vocab):
+        """ Function to write vocabulary list to a file.
+        @param file_path (str): file path to write the vocabulary.
+        @param vocab (list): vocabulary list.
+        """
         with open(file_path, 'w') as f:
             for word in vocab:
                 f.write("%s\n" % word)
         f.close()
+
 
 
 
@@ -116,4 +165,5 @@ class Utils():
                 i = i + 1
                 file.write(wv_string)
             file.close()
+
 

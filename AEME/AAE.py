@@ -2,9 +2,12 @@
 # File: DAEME.py
 # Author: Atharva Kulkarni
 
-from tensorflow.keras.layers import Input, Dense, Average
-import numpy as np
-from tensorflow.keras import Model
+#from tensorflow.keras.layers import Input, Dense, Average
+#import numpy as np
+#from tensorflow.keras import Model
+
+import torch
+import torch.nn as nn
 
 
 class AAE():
@@ -18,62 +21,85 @@ class AAE():
         @param lambda2 (int): Multiplicaiton factor for computing loss for part2. Default: 1.
         @param lambda3 (int): Multiplicaiton factor for computing loss for part3. Default: 1.
         """
-        self.latent_dim = latent_dim
+        super(CAE, self).__init__()
         self.activation = activation
-        self.lambda1 = lambda1
-        self.lambda2 = lambda2
-        self.lambda3 = lambda3
+        self.encoder1 = nn.Linear(in_features=input_dim, in_features=latent_dim)
+        nn.init.normal_(self.encoder1.weight, mean=0.0, std=0.01)
+        nn.init.zeros_(self.encoder1.bias)
+        
+        self.encoder2 = nn.Linear(in_features=input_dim, in_features=latent_dim)
+        nn.init.normal_(self.encoder2.weight, mean=0.0, std=0.01)
+        nn.init.zeros_(self.encoder2.bias)
+        
+        self.encoder3 = nn.Linear(in_features=input_dim, in_features=latent_dim)
+        nn.init.normal_(self.encoder3.weight, mean=0.0, std=0.01)
+        nn.init.zeros_(self.encoder3.bias)
+        
+        self.decoder1 = nn.Linear(in_features=latent_dim, in_features=input_dim)
+        nn.init.normal_(self.decoder1.weight, mean=0.0, std=0.01)
+        nn.init.zeros_(self.decoder1.bias)
+        
+        self.decoder2 = nn.Linear(in_features=latent_dim, in_features=input_dim)
+        nn.init.normal_(self.decoder2.weight, mean=0.0, std=0.01)
+        nn.init.zeros_(self.decoder2.bias)
+        
+        self.decoder3 = nn.Linear(in_features=latent_dim, in_features=input_dim)
+        nn.init.normal_(self.decoder3.weight, mean=0.0, std=0.01)
+        nn.init.zeros_(self.decoder3.bias)
+  
         
         
         
-    def build(self, input_dim):
-        """Function to build the Averaged autoencoder.
+    def forward(self, x1, x2, x3):
+        """Function to build the Concatenated autoencoder.
         @param input_dim (shape): shape of the input dimensions.
         """
-        input1 = Input(shape=(input_dim,))
-        Dense1 = Dense(self.latent_dim, activation=self.activation)(input1)
+        x1 = self.encoder1(x1)
+        x1 = self.activation(x1)
         
-        input2 = Input(shape=(input_dim,))
-        Dense2 = Dense(self.latent_dim, activation=self.activation)(input2)
+        x2 = self.encoder2(x2)
+        x2 = self.activation(x2)
         
-        input3 = Input(shape=(input_dim,))
-        Dense3 = Dense(self.latent_dim, activation=self.activation)(input3)
+        x3 = self.encoder3(x3)
+        x3 = self.activation(x3)
         
-        bottleneck = Average([Dense1, Dense2, Dense3])
+        bottleneck = torch.mean(torch.add(x1, x2, x3))
         
-        output1 = Dense(input_dim, activation=self.activation)(bottleneck)
-        output2 = Dense(input_dim, activation=self.activation)(bottleneck)
-        output3 = Dense(input_dim, activation=self.activation)(bottleneck)
+        x1 = self.decoder1(bottleneck)
+        x1 = self.activation(x1)
         
-        model = Model(inputs=[input1, input2, input3], outputs=[output1, output2, output3])
-        encoder = Model(inputs=[input1, input2, input3], outputs=bottleneck)
-        model.compile(optimizer="adam", loss=self.AAE_loss)
-        model.summary()
+        x2 = self.decoder2(bottleneck)
+        x2 = self.activation(x2)
         
-        return model, encoder
+        x3 = self.decoder3(bottleneck)
+        x3 = self.activation(x3)
         
-        
+       return [x1, x2, x3], bottleneck
         
         
-     def mse(self, y_true, y_pred, factor):   
+        
+        
+     def mse(self, output, target, factor):   
         """ Function to compute weighted Mean Squared Error (MSE)
-        @param y_true (array): input vector.
-        @param y_pred (array): output vector.
+        @param target (array): input vector.
+        @param output (array): output vector.
         @param factor (float): multiplicative factor.
         @return mse_loss (float): the mean squared error loss.        
         """
-        return factor*K.mean(K.square(y_true - y_pred))
+        return factor*K.mean(K.square(target - output))
         
         
-    def AAE_loss(self, y_true, y_pred):
-        """ Function to compute loss for Averaged Autoencoder.
-        @param y_true (np.array): input vector.
-        @param y_pred (np.array): output vector.
+        
+        
+     def loss(self, output, target):
+        """ Function to compute loss for Concatenated Autoencoder.
+        @param target (np.array): input vector.
+        @param output (np.array): output vector.
         @return loss (float): the computed loss
         """        
-        return (self.mse(y_true[0], y_pred[0], self.lambda1) + 
-                self.mse(y_true[1], y_pred[1], self.lambda2) + 
-                self.mse(y_true[2], y_pred[2], self.lambda3))
+        return (self.mse(target[0], output[0], self.lambda1) + 
+                self.mse(target[1], output[1], self.lambda2) + 
+                self.mse(target[2], output[2], self.lambda3))
         
         
         
