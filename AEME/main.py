@@ -3,7 +3,8 @@
 # Author: Atharva Kulkarni
 
 from utils import Utils
-#from AEME import AEME
+import torch
+from AEME import AEME
 
 import argparse
 from time import process_time
@@ -31,33 +32,36 @@ if __name__ == "__main__":
     
     
     # Map embeddings
+    '''
     start = process_time()
     print("\nLoading word2vec embeddings...")
     word2vec_dict = utils.get_embedding_dict(str(args.word2vec_path), vocab)
     end = process_time()
     print("\nTotal time taken: ", end-start)
-    
+    '''
     start = process_time()
     print("\nLoading glove embeddings...")
     glove_dict = utils.get_embedding_dict(str(args.glove_path), vocab)
     end = process_time()
     print("\nTotal time taken: ", end-start)
-    
+    '''
     start = process_time()
     print("\nLoading fasttext embeddings...")
     fasttext_dict = utils.get_embedding_dict(str(args.fasttext_path), vocab)
     end = process_time()
     print("\nTotal time taken: ", end-start)
-    
+    '''
     start = process_time()  
     print("\nMapping Embeddings...")  
-    x_train1, x_train2, x_train3 = utils.map_embeddings(vocab, word2vec_dict, glove_dict, fasttext_dict)
+    #x_train1, x_train2, x_train3 = utils.map_embeddings(vocab, word2vec_dict, glove_dict, fasttext_dict)
+    x_train1, x_train2, x_train3 = utils.map_embeddings(vocab, glove_dict, glove_dict, glove_dict)
     end = process_time()
     print("\nTotal time taken: ", end-start)
     print(x_train1.shape)
     print(x_train2.shape)
     print(x_train3.shape)
     
-
-
+    ae = AEME(mode="CAE", model_checkpoint="/content/gdrive/My Drive/Meta-Word-Embeddings/Autoencoder/CAE")
+    tensor_dataset = ae.prepare_input(x_train1, x_train2, x_train3)
+    ae.train(tensor_dataset)
 

@@ -5,9 +5,8 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, RandomSampler, DataLoader
-#from tensorflow.keras import backend as K
-#from tensorflow.keras.layers import LeakyReLU, PReLU, Activation
-#from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+import numpy as np
+import gc
 from DAE import DAE
 from CAE import CAE
 from AAE import AAE
@@ -16,9 +15,8 @@ from AAE import AAE
 class AEME():
     """ Class to implement Autoencoder for generating Meta-Embeddings """
     
-    def __init__(self, model_checkpoint_path, mode="DAE", latent_dim=100, activation="leaky_relu", lambda1=1, lambda2=1, lambda3=1, lambda4=1, lambda5=1, lambda6=1):
+    def __init__(self, mode="CAE", input_dim=300, latent_dim=100, activation="leaky_relu", lambda1=1, lambda2=1, lambda3=1, lambda4=1, lambda5=1, lambda6=1):
         """ Constructor to initialize autoencoder parameters
-        @param model_checkpoint_path (string): path to store ModelCheckpoints.
         @param mode (string): type of Autoencoder to build: Decoupled Autoencoder (DAE), Concatenated Autoencoder (CAE), Averaged Autoencoder (AAE).
         @param latent_dim (int): latent_dimension for each autoencoder. Default: 300.
         @ activation (string): type of activation: leaky_relu, paramaterized_leaky_relu, relu, tanh, and sigmoid. Default: leaky_relu.
@@ -29,6 +27,13 @@ class AEME():
         @param lambda5 (int): Multiplicaiton factor for computing loss for part5 ((Only for DAE). Default: 1.
         @param lambda6 (int): Multiplicaiton factor for computing loss for part6 ((Only for DAE). Default: 1.
         """
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda:0")
+            print("GPU : ", torch.cuda.get_device_name(0))
+        else:
+          self.device = torch.device("cpu")
+          print("CPU on")
+          
         self.mode = mode
         self.encoder = None
         
@@ -40,11 +45,11 @@ class AEME():
             activation = nn.ReLU()
               
         if mode == "DAE":
-            self.ae = DAE(latent_dim, activation, lambda1, lambda2, lambda3, lambda4, lambda5, lambda6)
+            self.ae = DAE(input_dim, latent_dim, activation, lambda1, lambda2, lambda3, lambda4, lambda5, lambda6)
         elif mode == "CAE":
-            self.ae = CAE(latent_dim, activation, lambda1, lambda2, lambda3)
+            self.ae = CAE(input_dim, latent_dim, activation, lambda1, lambda2, lambda3)
         elif mode == "AAE":
-            self.ae = AAE(latent_dim, activation, lambda1, lambda2, lambda3)
+            self.ae = AAE(input_dim, latent_dim, activation, lambda1, lambda2, lambda3)
                                                             
             
             
@@ -65,7 +70,7 @@ class AEME():
 
 
     
-    def prepare_input(x_train1, x_train2, x_train3, batch_size=128, masking_noise=True, masking_noise_factor=0.05): 
+    def prepare_input(self, x_train1, x_train2, x_train3, batch_size=128, masking_noise=True, masking_noise_factor=0.05): 
         """ Funciton to compile data in Dataloaders
         @param x_train1 (np.array): The input data1.
         @param x_train2 (np.array): The input data2.
@@ -85,7 +90,6 @@ class AEME():
         del x_train1
         del x_train2
         del x_train3
-        del tensor_dataset
         gc.collect()
         torch.cuda.empty_cache()
         return torch.utils.data.DataLoader(dataset=tensor_dataset, 
@@ -95,7 +99,7 @@ class AEME():
         
         
         
-    def train(self, data_loader, epochs=200):
+    def train(self, data_loader, epochs=200, checkpoint_path=""):
         """ Function to train the Autoencoder Model.    
         @param tensor_data_loader (torch.tensor): Batch-wise dataset.
         @@param epochs (int): Number of epochs for which the model is to be trained. Default: 10.
@@ -108,7 +112,7 @@ class AEME():
         training_loss = []
         
         if self.mode == "DAE": 
-            for step in range(epochs):
+            for step in range(1, epochs+1):
                 epoch_loss = 0.0
                 for batch_data in data_loader:
                     x_train1, x_train2, x_train3 = tuple(t.to(self.device) for t in batch_data)
@@ -118,40 +122,42 @@ class AEME():
                     loss.backward()
                     epoch_loss = epoch_loss + loss.item() 
                     optimizer.step()
-                loss = epoch_loss/len(data_loader)
-                training_loss.append(loss)
-                print("\nEpoch: {} of {} ----> loss: {:.3f}".format(step+1, epochs, loss))
+                epoch_loss = epoch_loss/len(data_loader)
+                training_loss.append(epoch_loss)
+                print("\nEpoch: {} of {} ----> loss: {:.3f}".format(step, epochs, epoch_loss))
                 
-                if loss >= training_loss[-2]:
-                    model_checkpoint = model_checkpoint + "_epoch_" + (step+1) + "_loss_" + loss + ".pt"
-                    torch.save({"epoch": step+1,
-                                "model_state_dict": self.ae.state_dict(),
-                                "optimizer_state_dict": optimizer.state_dict(),
-                                "loss": loss}, 
-                                model_checkpoint)
+                if len(training_loss) > 2:
+                  if epoch_loss < training_loss[-2]:
+                      model_checkpoint = checkpoint_path + "_epoch_" + str(step) + "_loss_" + str(epoch_loss) + ".pt"
+                      torch.save({"epoch": step,
+                                  "model_state_dict": self.ae.state_dict(),
+                                  "optimizer_state_dict": optimizer.state_dict(),
+                                  "loss": loss}, 
+                                  model_checkpoint)
                                 
         else:
-            for step in range(epochs):
+            for step in range(1, epochs+1):
                 epoch_loss = 0.0
                 for batch_data in data_loader:
                     x_train1, x_train2, x_train3 = tuple(t.to(self.device) for t in batch_data)
                     optimizer.zero_grad()
-                    output, _ = self.ae(x_train1, x_train2, x_train3)
+                    output, bottleneck = self.ae(x_train1, x_train2, x_train3)
                     loss = self.ae.loss(output, [x_train1, x_train2, x_train3])
                     loss.backward()
                     epoch_loss = epoch_loss + loss.item() 
                     optimizer.step()
-                loss = epoch_loss/len(data_loader)
-                training_loss.append(loss)
-                print("\nEpoch: {} of {} ----> loss: {:.3f}".format(step+1, epochs, loss))
+                epoch_loss = epoch_loss/len(data_loader)
+                training_loss.append(epoch_loss)
+                print("\nEpoch: {} of {} ----> loss: {:.3f}".format(step, epochs, epoch_loss))
                 
-                if loss >= training_loss[-2]:
-                    model_checkpoint = model_checkpoint + "_epoch_" + (step+1) + "_loss_" + loss + ".pt"
-                    torch.save({"epoch": step+1,
-                                "model_state_dict": self.ae.state_dict(),
-                                "optimizer_state_dict": optimizer.state_dict(),
-                                "loss": loss}, 
-                                model_checkpoint)
+                if len(training_loss) > 2:
+                  if epoch_loss < training_loss[-2]:
+                      model_checkpoint = checkpoint_path + "_epoch_" + str(step) + "_loss_" + str(epoch_loss) + ".pt"
+                      torch.save({"epoch": step,
+                                  "model_state_dict": self.ae.state_dict(),
+                                  "optimizer_state_dict": optimizer.state_dict(),
+                                  "loss": loss}, 
+                                  model_checkpoint)
   
         
    
@@ -166,9 +172,4 @@ class AEME():
         """
         self.model.load_weights(model_checkpoint)     
         return self.encoder.predict([x_test1, x_test2, x_test3])
-    
-            
-            
-            
-            
-            
+
