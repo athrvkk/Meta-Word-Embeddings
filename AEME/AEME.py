@@ -5,6 +5,8 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, RandomSampler, DataLoader
+from sklearn.preprocessing import LabelEncoder
+import time
 import numpy as np
 import gc
 from DAE import DAE
@@ -27,6 +29,7 @@ class AEME():
         @param lambda5 (int): Multiplicaiton factor for computing loss for part5 ((Only for DAE). Default: 1.
         @param lambda6 (int): Multiplicaiton factor for computing loss for part6 ((Only for DAE). Default: 1.
         """
+        self.label_encoder = LabelEncoder()
         if torch.cuda.is_available():
             self.device = torch.device("cuda:0")
             print("GPU : ", torch.cuda.get_device_name(0))
@@ -54,6 +57,7 @@ class AEME():
             
             
 
+
     def add_noise(self, data, masking_noise_factor):   
         """Function to add mask noise to data.
         @param data (np.array): data to add noise to.
@@ -70,8 +74,10 @@ class AEME():
 
 
     
-    def prepare_input(self, x_train1, x_train2, x_train3, batch_size=128, masking_noise=True, masking_noise_factor=0.05): 
-        """ Funciton to compile data in Dataloaders
+
+    def prepare_input(self, vocab, x_train1, x_train2, x_train3, batch_size=128, masking_noise=True, masking_noise_factor=0.05): 
+        """ Funciton to generate Tensor Dataset.
+        @param vocab (list): list of intersection vocabulary.
         @param x_train1 (np.array): The input data1.
         @param x_train2 (np.array): The input data2.
         @param x_train3 (np.array): The input data3.
@@ -79,6 +85,8 @@ class AEME():
         @param masking_noise (bool): To add Masking Noise or not.
         @param masking_noise_factor (float): Percentage noise to be induced in the input data. Default: 0.05 or 5%.
         """
+        vocab = torch.as_tensor(self.label_encoder.fit_transform(vocab))
+
         if masking_noise:
             x_train1 = self.add_noise(x_train1, masking_noise_factor)
             x_train2 = self.add_noise(x_train2, masking_noise_factor)
@@ -86,10 +94,12 @@ class AEME():
             
         tensor_dataset = torch.utils.data.TensorDataset(x_train1, 
                                                         x_train2, 
-                                                        x_train3)
+                                                        x_train3,
+                                                        vocab)
         del x_train1
         del x_train2
         del x_train3
+        del vocab
         gc.collect()
         torch.cuda.empty_cache()
         return torch.utils.data.DataLoader(dataset=tensor_dataset, 
@@ -99,22 +109,24 @@ class AEME():
         
         
         
-    def train(self, data_loader, epochs=200, checkpoint_path=""):
+
+    def train(self, tensor_dataset, epochs=200, checkpoint_path=""):
         """ Function to train the Autoencoder Model.    
-        @param tensor_data_loader (torch.tensor): Batch-wise dataset.
+        @param tensor_dataset (torch.tensor): Batch-wise dataset.
         @@param epochs (int): Number of epochs for which the model is to be trained. Default: 10.
         """
         self.ae.train()
         self.ae.to(self.device)
      
-        optimizer = torch.optim.Adam(self.ae.parameters())    
+        optimizer = torch.optim.Adam(self.ae.parameters(), lr=0.001)    
         
         training_loss = []
         
         if self.mode == "DAE": 
             for step in range(1, epochs+1):
+                start = time.time()
                 epoch_loss = 0.0
-                for batch_data in data_loader:
+                for batch_data in tensor_dataset:
                     x_train1, x_train2, x_train3 = tuple(t.to(self.device) for t in batch_data)
                     optimizer.zero_grad()
                     output, bottleneck = self.ae(x_train1, x_train2, x_train3)
@@ -122,13 +134,14 @@ class AEME():
                     loss.backward()
                     epoch_loss = epoch_loss + loss.item() 
                     optimizer.step()
-                epoch_loss = epoch_loss/len(data_loader)
+                epoch_loss = epoch_loss/len(tensor_dataset)
                 training_loss.append(epoch_loss)
-                print("\nEpoch: {} of {} ----> loss: {:.3f}".format(step, epochs, epoch_loss))
+                end = time.time()
+                print("\nEpoch: {} of {} ----> loss: {:.3f}\t ETA: {:.2f} ms".format(step, epochs, epoch_loss, (end-start)*1000))
                 
                 if len(training_loss) > 2:
                   if epoch_loss < training_loss[-2]:
-                      model_checkpoint = checkpoint_path + "_epoch_" + str(step) + "_loss_" + str(epoch_loss) + ".pt"
+                      model_checkpoint = checkpoint_path + "_epoch_{}_loss_{:.6f}.pt".format(step, epoch_loss)
                       torch.save({"epoch": step,
                                   "model_state_dict": self.ae.state_dict(),
                                   "optimizer_state_dict": optimizer.state_dict(),
@@ -137,8 +150,9 @@ class AEME():
                                 
         else:
             for step in range(1, epochs+1):
+                start = time.time()
                 epoch_loss = 0.0
-                for batch_data in data_loader:
+                for batch_data in tensor_dataset:
                     x_train1, x_train2, x_train3 = tuple(t.to(self.device) for t in batch_data)
                     optimizer.zero_grad()
                     output, bottleneck = self.ae(x_train1, x_train2, x_train3)
@@ -146,13 +160,14 @@ class AEME():
                     loss.backward()
                     epoch_loss = epoch_loss + loss.item() 
                     optimizer.step()
-                epoch_loss = epoch_loss/len(data_loader)
+                epoch_loss = epoch_loss/len(tensor_dataset)
                 training_loss.append(epoch_loss)
-                print("\nEpoch: {} of {} ----> loss: {:.3f}".format(step, epochs, epoch_loss))
+                end = time.time()
+                print("\nEpoch: {} of {} ----> loss: {:.3f}\t ETA: {:.2f} ms".format(step, epochs, epoch_loss, (end-start)*1000))
                 
                 if len(training_loss) > 2:
                   if epoch_loss < training_loss[-2]:
-                      model_checkpoint = checkpoint_path + "_epoch_" + str(step) + "_loss_" + str(epoch_loss) + ".pt"
+                      model_checkpoint = checkpoint_path + "_epoch_{}_loss_{:.6f}.pt".format(step, epoch_loss)
                       torch.save({"epoch": step,
                                   "model_state_dict": self.ae.state_dict(),
                                   "optimizer_state_dict": optimizer.state_dict(),
@@ -161,8 +176,9 @@ class AEME():
   
         
    
+  
    
-    def predict(self, x_test1, x_test2, x_test3, model_checkpoint):
+    def predict(self, tensor_dataset, model_checkpoint):
         """ Function to generate predictions of the autoencoder's encoder.
         @param x_test1 (np.array): test input 1.
         @param x_test2 (np.array): test input 2.
@@ -170,6 +186,25 @@ class AEME():
         @param model_checkpoint (string): model weights.
         @return predictions (np.array): Autoencoder's encoder's predictions.
         """
-        self.model.load_weights(model_checkpoint)     
-        return self.encoder.predict([x_test1, x_test2, x_test3])
+        self.ae.load_state_dict(torch.load(model_checkpoint['model_state_dict']))
+        self.ae.eval()
+        self.ae.to(self.device)
+        
+        embedding_dict = dict()
+        for batch_data in tensor_dataset:
+            x_train1, x_train2, x_train3, word = tuple(t.to(self.device) for t in batch_data)
+            word = str(self.label_encoder.inverse_transform(word))
+            with torch.no_grad():
+                _, bottleneck = self.ae(x_train1, x_train2, x_train3)
+                embedding_dict[word] = torch.tensor(bottleneck, dtype=torch.long, device=self.device)
+                del batch_data
+                del x_train1
+                del x_train2
+                del x_train3
+                del word
+                del bottleneck
+                gc.collect()
+                torch.cuda.empty_cache()
+        return embedding_dict
+
 

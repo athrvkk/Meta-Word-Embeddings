@@ -1,5 +1,5 @@
 # Class to implement the Concatenated Autoencoder
-# File: DAEME.py
+# File: CAE.py
 # Author: Atharva Kulkarni
 
 import torch
@@ -11,7 +11,8 @@ class CAE(nn.Module):
     
     def __init__(self, input_dim, latent_dim, activation, lambda1, lambda2, lambda3):
         """ Constructor
-        @param latent_dim (int): latent_dimension for each autoencoder. Default: 300.
+        @param input_dim (int): Input dimension for the autoencoders .Default: 300.
+        @param latent_dim (int): latent_dimension for each autoencoders. Default: 300.
         @ activation (string): type of activation: leaky_relu, paramaterized_leaky_relu, relu, tanh, and sigmoid. Default: leaky_relu.
         @param lambda1 (int): Multiplicaiton factor for computing loss for part1. Default: 1.
         @param lambda2 (int): Multiplicaiton factor for computing loss for part2. Default: 1.
@@ -31,7 +32,7 @@ class CAE(nn.Module):
         nn.init.normal_(self.encoder2.weight, mean=0.0, std=0.01)
         nn.init.zeros_(self.encoder2.bias)
         
-        self.encoder3 = nn.Linear(in_features=3*latent_dim, out_features=latent_dim)
+        self.encoder3 = nn.Linear(in_features=input_dim, out_features=latent_dim)
         nn.init.normal_(self.encoder3.weight, mean=0.0, std=0.01)
         nn.init.zeros_(self.encoder3.bias)
         
@@ -102,3 +103,4 @@ class CAE(nn.Module):
                 self.mse(target[2], output[2], self.lambda3))
         
       
+

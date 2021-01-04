@@ -1,18 +1,18 @@
 # Class to implement the Decopuled Autoencoder
-# File: DAEME.py
+# File: DAE.py
 # Author: Atharva Kulkarni
-
 
 import torch
 import torch.nn as nn
 
 
-class DAE():
+class DAE(nn.Module):
     """ Class to implement the Decopuled Autoencoder """
     
     def __init__(self, input_dim, latent_dim, activation, lambda1, lambda2, lambda3, lambda4, lambda5, lambda6):
         """ Constructor
-        @param latent_dim (int): latent_dimension for each autoencoder. Default: 300.
+        @param input_dim (int): Input dimension for the autoencoders .Default: 300.
+        @param latent_dim (int): latent_dimension for each autoencoders. Default: 300.
         @ activation (string): type of activation: leaky_relu, paramaterized_leaky_relu, relu, tanh, and sigmoid. Default: leaky_relu.
         @param lambda1 (int): Multiplicaiton factor for computing loss for part1. Default: 1.
         @param lambda2 (int): Multiplicaiton factor for computing loss for part2. Default: 1.
@@ -22,7 +22,15 @@ class DAE():
         @param lambda6 (int): Multiplicaiton factor for computing loss for part6. Default: 1.
         """
         super(DAE, self).__init__()
+        self.latent_dim = latent_dim
         self.activation = activation
+        self.lambda1 = lambda1
+        self.lambda2 = lambda2
+        self.lambda3 = lambda3
+        self.lambda4 = lambda4
+        self.lambda5 = lambda5
+        self.lambda6 = lambda6
+
         self.encoder1 = nn.Linear(in_features=input_dim, out_features=latent_dim)
         nn.init.normal_(self.encoder1.weight, mean=0.0, std=0.01)
         nn.init.zeros_(self.encoder1.bias)
@@ -63,7 +71,7 @@ class DAE():
         x3 = self.encoder3(x3)
         x3 = self.activation(x3)
         
-        bottleneck = torch.cat([x1, x2, x3], dim=1)
+        bottleneck = torch.cat((x1, x2, x3), dim=1)
         
         x1 = self.decoder1(x1)
         x1 = self.activation(x1)
@@ -78,7 +86,7 @@ class DAE():
         
         
         
-        
+         
     def mse(self, output, target, factor):   
         """ Function to compute weighted Mean Squared Error (MSE)
         @param target (array): input vector.
@@ -87,27 +95,23 @@ class DAE():
         @return mse_loss (float): the mean squared error loss.        
         """
         return factor*torch.mean((output - target)**2)
-    
-    
-    
-    
+        
+        
+        
+        
     def loss(self, output, target):
-        """ Function to compute loss for Concatenated Autoencoder.
+        """ Function to compute loss for Decopuled Autoencoder.
         @param target (np.array): input vector.
         @param output (np.array): output vector.
         @return loss (float): the computed loss
-        """        
-        output, encoder_output = output
+        """
+        output, encoder_output = output   
         return (self.mse(target[0], output[0], self.lambda1) + 
                 self.mse(target[1], output[1], self.lambda2) + 
-                self.mse(target[2], output[2], self.lambda3) + 
-                self.mse(encoder_output[:300], encoder_output[300:600], self.lambda4) +
-                self.mse(encoder_output[300:600], encoder_output[600:], self.lambda5) +
-                self.mse(encoder_output[600:], encoder_output[:300], self.lambda6))
-                
-                
-                
+                self.mse(target[2], output[2], self.lambda3) +
+                self.mse(encoder_output[0:][:self.latent_dim], encoder_output[0:][self.latent_dim: self.latent_dim*2], self.lambda3) +
+                self.mse(encoder_output[0:][self.latent_dim: self.latent_dim*2], encoder_output[0:][self.latent_dim*2:], self.lambda3) +
+                self.mse(encoder_output[0:][self.latent_dim*2:], encoder_output[0:][:self.latent_dim], self.lambda3))
         
-                    
+      
 
-        
