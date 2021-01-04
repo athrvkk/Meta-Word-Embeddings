@@ -105,13 +105,14 @@ class DAE(nn.Module):
         @param output (np.array): output vector.
         @return loss (float): the computed loss
         """
-        output, encoder_output = output   
+        output, encoder_output = output
+        encoder_output = torch.split(encoder_output, self.latent_dim, dim=1)
         return (self.mse(target[0], output[0], self.lambda1) + 
                 self.mse(target[1], output[1], self.lambda2) + 
                 self.mse(target[2], output[2], self.lambda3) +
-                self.mse(encoder_output[0:][:self.latent_dim], encoder_output[0:][self.latent_dim: self.latent_dim*2], self.lambda3) +
-                self.mse(encoder_output[0:][self.latent_dim: self.latent_dim*2], encoder_output[0:][self.latent_dim*2:], self.lambda3) +
-                self.mse(encoder_output[0:][self.latent_dim*2:], encoder_output[0:][:self.latent_dim], self.lambda3))
+                self.mse(encoder_output[0], encoder_output[1], self.lambda4) +
+                self.mse(encoder_output[1], encoder_output[2], self.lambda5) +
+                self.mse(encoder_output[2], encoder_output[0], self.lambda6))
         
       
 

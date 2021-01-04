@@ -9,9 +9,9 @@ from sklearn.preprocessing import LabelEncoder
 import time
 import numpy as np
 import gc
-from DAE import DAE
-from CAE import CAE
-from AAE import AAE
+#from DAE import DAE
+#from CAE import CAE
+#from AAE import AAE
 
 
 class AEME():
@@ -127,7 +127,7 @@ class AEME():
                 start = time.time()
                 epoch_loss = 0.0
                 for batch_data in tensor_dataset:
-                    x_train1, x_train2, x_train3 = tuple(t.to(self.device) for t in batch_data)
+                    x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
                     optimizer.zero_grad()
                     output, bottleneck = self.ae(x_train1, x_train2, x_train3)
                     loss = self.ae.loss([output, bottleneck], [x_train1, x_train2, x_train3])
@@ -153,7 +153,7 @@ class AEME():
                 start = time.time()
                 epoch_loss = 0.0
                 for batch_data in tensor_dataset:
-                    x_train1, x_train2, x_train3 = tuple(t.to(self.device) for t in batch_data)
+                    x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
                     optimizer.zero_grad()
                     output, bottleneck = self.ae(x_train1, x_train2, x_train3)
                     loss = self.ae.loss(output, [x_train1, x_train2, x_train3])
