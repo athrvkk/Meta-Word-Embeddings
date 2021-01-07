@@ -75,7 +75,7 @@ class AEME():
 
     
 
-    def prepare_input(self, vocab, x_train1, x_train2, x_train3, batch_size=128, masking_noise=True, masking_noise_factor=0.05): 
+    def prepare_input(self, vocab, x_train1, x_train2, x_train3, batch_size=128, masking_noise_factor=0.05): 
         """ Funciton to generate Tensor Dataset.
         @param vocab (list): list of intersection vocabulary.
         @param x_train1 (np.array): The input data1.
@@ -85,17 +85,22 @@ class AEME():
         @param masking_noise (bool): To add Masking Noise or not.
         @param masking_noise_factor (float): Percentage noise to be induced in the input data. Default: 0.05 or 5%.
         """
-        vocab = torch.as_tensor(self.label_encoder.fit_transform(vocab))
+        vocab = torch.as_tensor(self.label_encoder.fit_transform(vocab), device=self.device)
 
-        if masking_noise:
-            x_train1 = self.add_noise(x_train1, masking_noise_factor)
-            x_train2 = self.add_noise(x_train2, masking_noise_factor)
-            x_train3 = self.add_noise(x_train3, masking_noise_factor)
+        x_train1_noisy = self.add_noise(x_train1, masking_noise_factor)
+        x_train2_noisy = self.add_noise(x_train2, masking_noise_factor)
+        x_train3_noisy = self.add_noise(x_train3, masking_noise_factor)
             
-        tensor_dataset = torch.utils.data.TensorDataset(x_train1, 
+        tensor_dataset = torch.utils.data.TensorDataset(x_train1_noisy, 
+                                                        x_train2_noisy, 
+                                                        x_train3_noisy,
+                                                        x_train1, 
                                                         x_train2, 
                                                         x_train3,
                                                         vocab)
+        del x_train1_noisy
+        del x_train2_noisy
+        del x_train3_noisy
         del x_train1
         del x_train2
         del x_train3
@@ -127,9 +132,9 @@ class AEME():
                 start = time.time()
                 epoch_loss = 0.0
                 for batch_data in tensor_dataset:
-                    x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
+                    x_train1_noisy, x_train2_noisy, x_train3_noisy, x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
                     optimizer.zero_grad()
-                    output, bottleneck = self.ae(x_train1, x_train2, x_train3)
+                    output, bottleneck = self.ae(x_train1_noisy, x_train2_noisy, x_train3_noisy)
                     loss = self.ae.loss([output, bottleneck], [x_train1, x_train2, x_train3])
                     loss.backward()
                     epoch_loss = epoch_loss + loss.item() 
@@ -142,20 +147,16 @@ class AEME():
                 if len(training_loss) > 2:
                   if epoch_loss < training_loss[-2]:
                       model_checkpoint = checkpoint_path + "_epoch_{}_loss_{:.6f}.pt".format(step, epoch_loss)
-                      torch.save({"epoch": step,
-                                  "model_state_dict": self.ae.state_dict(),
-                                  "optimizer_state_dict": optimizer.state_dict(),
-                                  "loss": loss}, 
-                                  model_checkpoint)
+                      torch.save(self.ae.state_dict(), model_checkpoint)
                                 
         else:
             for step in range(1, epochs+1):
                 start = time.time()
                 epoch_loss = 0.0
                 for batch_data in tensor_dataset:
-                    x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
+                    x_train1_noisy, x_train2_noisy, x_train3_noisy, x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
                     optimizer.zero_grad()
-                    output, bottleneck = self.ae(x_train1, x_train2, x_train3)
+                    output, bottleneck = self.ae(x_train1_noisy, x_train2_noisy, x_train3_noisy)
                     loss = self.ae.loss(output, [x_train1, x_train2, x_train3])
                     loss.backward()
                     epoch_loss = epoch_loss + loss.item() 
@@ -168,12 +169,8 @@ class AEME():
                 if len(training_loss) > 2:
                   if epoch_loss < training_loss[-2]:
                       model_checkpoint = checkpoint_path + "_epoch_{}_loss_{:.6f}.pt".format(step, epoch_loss)
-                      torch.save({"epoch": step,
-                                  "model_state_dict": self.ae.state_dict(),
-                                  "optimizer_state_dict": optimizer.state_dict(),
-                                  "loss": loss}, 
-                                  model_checkpoint)
-  
+                      torch.save(self.ae.state_dict(), model_checkpoint)
+                      
         
    
   
@@ -186,22 +183,26 @@ class AEME():
         @param model_checkpoint (string): model weights.
         @return predictions (np.array): Autoencoder's encoder's predictions.
         """
-        self.ae.load_state_dict(torch.load(model_checkpoint['model_state_dict']))
+        self.ae.load_state_dict(torch.load(model_checkpoint))
         self.ae.eval()
         self.ae.to(self.device)
         
         embedding_dict = dict()
         for batch_data in tensor_dataset:
-            x_train1, x_train2, x_train3, word = tuple(t.to(self.device) for t in batch_data)
-            word = str(self.label_encoder.inverse_transform(word))
+            _, _, _, x_train1, x_train2, x_train3, words = tuple(t.to(self.device) for t in batch_data)
+            words = self.label_encoder.inverse_transform(words.to('cpu')).tolist()
+            
             with torch.no_grad():
                 _, bottleneck = self.ae(x_train1, x_train2, x_train3)
-                embedding_dict[word] = torch.tensor(bottleneck, dtype=torch.long, device=self.device)
+                bottleneck = torch.split(bottleneck, 1, dim=0)
+                for word, vec in list(zip(words, bottleneck)):
+                    embedding_dict[word] = vec[0]
+            
                 del batch_data
                 del x_train1
                 del x_train2
                 del x_train3
-                del word
+                del words
                 del bottleneck
                 gc.collect()
                 torch.cuda.empty_cache()

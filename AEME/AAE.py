@@ -36,15 +36,15 @@ class AAE(nn.Module):
         nn.init.normal_(self.encoder3.weight, mean=0.0, std=0.01)
         nn.init.zeros_(self.encoder3.bias)
         
-        self.decoder1 = nn.Linear(in_features=input_dim, out_features=input_dim)
+        self.decoder1 = nn.Linear(in_features=latent_dim, out_features=input_dim)
         nn.init.normal_(self.decoder1.weight, mean=0.0, std=0.01)
         nn.init.zeros_(self.decoder1.bias)
         
-        self.decoder2 = nn.Linear(in_features=input_dim, out_features=input_dim)
+        self.decoder2 = nn.Linear(in_features=latent_dim, out_features=input_dim)
         nn.init.normal_(self.decoder2.weight, mean=0.0, std=0.01)
         nn.init.zeros_(self.decoder2.bias)
         
-        self.decoder3 = nn.Linear(in_features=input_dim, out_features=input_dim)
+        self.decoder3 = nn.Linear(in_features=latent_dim, out_features=input_dim)
         nn.init.normal_(self.decoder3.weight, mean=0.0, std=0.01)
         nn.init.zeros_(self.decoder3.bias)
         
@@ -64,7 +64,8 @@ class AAE(nn.Module):
         x3 = self.encoder3(x3)
         x3 = self.activation(x3)
         
-        bottleneck = torch.div(x1+x2+x3, torch.norm(x1+x2+x3))
+        #bottleneck = torch.div(x1+x2+x3, torch.norm(x1+x2+x3))
+        bottleneck = x1 + x2 + x3
         
         x1 = self.decoder1(bottleneck)
         x1 = self.activation(x1)
