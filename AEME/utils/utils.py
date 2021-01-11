@@ -96,6 +96,25 @@ class Utils():
 
 
     
+    def get_specific_embeddings(embedding_dict, vocab):
+        """ Function to retrieve a subset of original embeddings based on the list of document-ids passed.
+        @param vocab (list / numpy.array): List of vocabulary.
+        @param embedding_dict (dict): Dictionary of words/documents as keys and their respective embeddings as values.
+        @return embedding_matrix (torch.tensor): a tensor containing the embeddings of specified document ids.
+        """
+        embeddings = []
+
+        for key in embedding_dict:
+            if key in ids:
+                embeddings.append(embedding_dict[key])
+
+        embedding_matrix = np.array(embeddings)
+        return embedding_matrix
+
+
+
+
+    
     def map_embeddings(self, vocab, embedding_dict1, embedding_dict2, embedding_dict3):
         """ Funciton to map embeddings.
         @param vocab (list): list of the vocabulary to map embeddings for.
@@ -149,21 +168,21 @@ class Utils():
 
 
 
-    def write_embeddings(self, path, vocab, embeddings):
-            """ Fucntion to write embeddings to a file
-            @param path (str): path to the file where embeddings are to be written to.
-            @param vocab (list): vocabulary or id of the total words/ documents of whom we have the embeddings.
-            @param embeddings (np.arrau): embedding array of shape (document/vocab size, embedding dimensions).
-            """
-            file = open(path, "w")
-            i = 0
-            for word in vocab:
-                wv_string = ""
-                for vi in embeddings[i].tolist():
-                    wv_string = wv_string + " " + str(vi)
-                wv_string = str(word) + " " + str(wv_string) + "\n"
-                i = i + 1
-                file.write(wv_string)
-            file.close()
+    def write_embeddings(self, path, vocab, embedding_dict):
+        """ Fucntion to write embeddings to a file
+        @param path (str): path to the file where embeddings are to be written to.
+        @param vocab (list): vocabulary or id of the total words/ documents of whom we have the embeddings.
+        @param embedding_dict (dictionary): embedding dictionary.
+        """
+        file = open(path, "w")
+        i = 0
+        for word in vocab:
+            wv_string = ""
+            for vi in embedding_dict.get(word).tolist():
+                wv_string = wv_string + " " + str(vi)
+            wv_string = str(word) + " " + str(wv_string) + "\n"
+            i = i + 1
+            file.write(wv_string)
+        file.close()
 
 

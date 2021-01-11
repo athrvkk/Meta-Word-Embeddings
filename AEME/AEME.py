@@ -132,8 +132,8 @@ class AEME():
                 start = time.time()
                 epoch_loss = 0.0
                 for batch_data in tensor_dataset:
-                    x_train1_noisy, x_train2_noisy, x_train3_noisy, x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
                     optimizer.zero_grad()
+                    x_train1_noisy, x_train2_noisy, x_train3_noisy, x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
                     output, bottleneck = self.ae(x_train1_noisy, x_train2_noisy, x_train3_noisy)
                     loss = self.ae.loss([output, bottleneck], [x_train1, x_train2, x_train3])
                     loss.backward()
@@ -142,11 +142,11 @@ class AEME():
                 epoch_loss = epoch_loss/len(tensor_dataset)
                 training_loss.append(epoch_loss)
                 end = time.time()
-                print("\nEpoch: {} of {} ----> loss: {:.3f}\t ETA: {:.2f} ms".format(step, epochs, epoch_loss, (end-start)*1000))
+                print("\nEpoch: {} of {} ----> loss: {:.5f}\t ETA: {:.2f} s".format(step, epochs, epoch_loss, (end-start)))
                 
                 if len(training_loss) > 2:
                   if epoch_loss < training_loss[-2]:
-                      model_checkpoint = checkpoint_path + "_epoch_{}_loss_{:.6f}.pt".format(step, epoch_loss)
+                      model_checkpoint = checkpoint_path + "_epoch_{}_loss_{:.5f}.pt".format(step, epoch_loss)
                       torch.save(self.ae.state_dict(), model_checkpoint)
                                 
         else:
@@ -154,8 +154,8 @@ class AEME():
                 start = time.time()
                 epoch_loss = 0.0
                 for batch_data in tensor_dataset:
-                    x_train1_noisy, x_train2_noisy, x_train3_noisy, x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
                     optimizer.zero_grad()
+                    x_train1_noisy, x_train2_noisy, x_train3_noisy, x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
                     output, bottleneck = self.ae(x_train1_noisy, x_train2_noisy, x_train3_noisy)
                     loss = self.ae.loss(output, [x_train1, x_train2, x_train3])
                     loss.backward()
@@ -164,11 +164,11 @@ class AEME():
                 epoch_loss = epoch_loss/len(tensor_dataset)
                 training_loss.append(epoch_loss)
                 end = time.time()
-                print("\nEpoch: {} of {} ----> loss: {:.3f}\t ETA: {:.2f} ms".format(step, epochs, epoch_loss, (end-start)*1000))
+                print("\nEpoch: {} of {} ----> loss: {:5f}\t ETA: {:.2f} s".format(step, epochs, epoch_loss, (end-start)))
                 
                 if len(training_loss) > 2:
                   if epoch_loss < training_loss[-2]:
-                      model_checkpoint = checkpoint_path + "_epoch_{}_loss_{:.6f}.pt".format(step, epoch_loss)
+                      model_checkpoint = checkpoint_path + "_epoch_{}_loss_{:.5f}.pt".format(step, epoch_loss)
                       torch.save(self.ae.state_dict(), model_checkpoint)
                       
         
