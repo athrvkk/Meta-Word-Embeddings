@@ -4,6 +4,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as functional
 
 
 class DAE(nn.Module):
@@ -71,7 +72,7 @@ class DAE(nn.Module):
         x3 = self.encoder3(x3)
         x3 = self.activation(x3)
         
-        bottleneck = torch.cat((x1, x2, x3), dim=1)
+        bottleneck = functional.normalize(torch.cat((x1, x2, x3), dim=1), dim=1)
         
         x1 = self.decoder1(x1)
         x1 = self.activation(x1)

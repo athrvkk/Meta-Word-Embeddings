@@ -4,6 +4,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as functional
 
 
 class AAE(nn.Module):
@@ -64,7 +65,7 @@ class AAE(nn.Module):
         x3 = self.encoder3(x3)
         x3 = self.activation(x3)
         
-        bottleneck = torch.div(x1+x2+x3, torch.norm(x1+x2+x3))
+        bottleneck = functional.normalize(torch.div(x1+x2+x3, torch.norm(x1+x2+x3)), dim=1)
         
         x1 = self.decoder1(bottleneck)
         x1 = self.activation(x1)

@@ -9,9 +9,9 @@ from sklearn.preprocessing import LabelEncoder
 import time
 import numpy as np
 import gc
-#from DAE import DAE
-#from CAE import CAE
-#from AAE import AAE
+from DAE import DAE
+from CAE import CAE
+from AAE import AAE
 
 
 class AEME():
@@ -115,7 +115,7 @@ class AEME():
         
         
 
-    def train(self, tensor_dataset, epochs=200, checkpoint_path=""):
+    def train(self, tensor_dataset, epochs=500, checkpoint_path=""):
         """ Function to train the Autoencoder Model.    
         @param tensor_dataset (torch.tensor): Batch-wise dataset.
         @@param epochs (int): Number of epochs for which the model is to be trained. Default: 10.
