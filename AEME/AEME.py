@@ -156,7 +156,7 @@ class AEME():
                 for batch_data in tensor_dataset:
                     optimizer.zero_grad()
                     x_train1_noisy, x_train2_noisy, x_train3_noisy, x_train1, x_train2, x_train3, _ = tuple(t.to(self.device) for t in batch_data)
-                    output, bottleneck = self.ae(x_train1_noisy, x_train2_noisy, x_train3_noisy)
+                    output, _ = self.ae(x_train1_noisy, x_train2_noisy, x_train3_noisy)
                     loss = self.ae.loss(output, [x_train1, x_train2, x_train3])
                     loss.backward()
                     epoch_loss = epoch_loss + loss.item() 
