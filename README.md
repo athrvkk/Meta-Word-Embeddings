@@ -6,3 +6,7 @@
   * Concatenated Autoencoder (CAE)
   * Averaged Autoencoder (AAE)
 * Each of them is explained below.
+
+# Decopuled Autoencoded Meta-Embeddings (DAEME)
+# Concatenated Autoencoded Meta-Embeddings (CAEME)
+# Averaged Autoencoded Meta-Embeddings (AAEME)
